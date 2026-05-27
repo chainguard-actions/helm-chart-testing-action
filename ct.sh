@@ -79,6 +79,11 @@ install_chart_testing() {
         exit 1
     fi
 
+    # Sanitize version inputs to prevent newline injection into GITHUB_PATH / GITHUB_ENV
+    version="$(printf '%s' "${version}" | tr -d '\n\r')"
+    yamllint_version="$(printf '%s' "${yamllint_version}" | tr -d '\n\r')"
+    yamale_version="$(printf '%s' "${yamale_version}" | tr -d '\n\r')"
+
     local arch
     if [[ $(uname -m) == "aarch64" ]]; then
       arch=arm64
@@ -122,16 +127,14 @@ install_chart_testing() {
 
     # https://github.com/helm/chart-testing-action/issues/62
     echo 'Adding ct directory to PATH...'
-    safe_cache_dir=$(printf '%s' "${cache_dir}" | tr -d '\n\r')
-    safe_venv_dir=$(printf '%s' "${venv_dir}" | tr -d '\n\r')
-    printf '%s\n' "${safe_cache_dir}" >> "${GITHUB_PATH}"
+    printf '%s\n' "$(printf '%s' "${cache_dir}" | tr -d '\n\r')" >> "${GITHUB_PATH}"
 
     echo 'Setting CT_CONFIG_DIR...'
-    printf 'CT_CONFIG_DIR=%s\n' "${safe_cache_dir}/etc" >> "${GITHUB_ENV}"
+    printf 'CT_CONFIG_DIR=%s\n' "$(printf '%s' "${cache_dir}/etc" | tr -d '\n\r')" >> "${GITHUB_ENV}"
 
     echo 'Configuring environment variables for virtual environment for subsequent workflow steps...'
-    printf 'VIRTUAL_ENV=%s\n' "${safe_venv_dir}" >> "${GITHUB_ENV}"
-    printf '%s\n' "${safe_venv_dir}/bin" >> "${GITHUB_PATH}"
+    printf 'VIRTUAL_ENV=%s\n' "$(printf '%s' "${venv_dir}" | tr -d '\n\r')" >> "${GITHUB_ENV}"
+    printf '%s\n' "$(printf '%s' "${venv_dir}/bin" | tr -d '\n\r')" >> "${GITHUB_PATH}"
 
     "${cache_dir}/ct" version
 }

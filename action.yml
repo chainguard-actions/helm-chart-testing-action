@@ -27,7 +27,7 @@ runs:
         CT_YAMLLINT_VERSION: ${{ inputs.yamllint_version }}
         CT_YAMALE_VERSION: ${{ inputs.yamale_version }}
       run: |
-        cd "$GITHUB_ACTION_PATH" \
+        cd $GITHUB_ACTION_PATH \
         && ./ct.sh \
             --version "$CT_VERSION" \
             --yamllint-version "$CT_YAMLLINT_VERSION" \
