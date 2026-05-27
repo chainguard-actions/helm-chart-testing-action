@@ -79,7 +79,7 @@ install_chart_testing() {
         exit 1
     fi
 
-    # Sanitize version inputs to prevent newline injection into GITHUB_PATH / GITHUB_ENV
+    # Sanitize inputs to prevent newline injection into GITHUB_ENV / GITHUB_PATH
     version="$(printf '%s' "${version}" | tr -d '\n\r')"
     yamllint_version="$(printf '%s' "${yamllint_version}" | tr -d '\n\r')"
     yamale_version="$(printf '%s' "${yamale_version}" | tr -d '\n\r')"

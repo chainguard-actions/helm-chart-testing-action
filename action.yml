@@ -23,13 +23,13 @@ runs:
     - uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
     - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
     - env:
-        CT_VERSION: ${{ inputs.version }}
-        CT_YAMLLINT_VERSION: ${{ inputs.yamllint_version }}
-        CT_YAMALE_VERSION: ${{ inputs.yamale_version }}
+        VERSION: ${{ inputs.version }}
+        YAMLLINT_VERSION: ${{ inputs.yamllint_version }}
+        YAMALE_VERSION: ${{ inputs.yamale_version }}
       run: |
         cd $GITHUB_ACTION_PATH \
         && ./ct.sh \
-            --version "$CT_VERSION" \
-            --yamllint-version "$CT_YAMLLINT_VERSION" \
-            --yamale-version "$CT_YAMALE_VERSION"
+            --version "$VERSION" \
+            --yamllint-version "$YAMLLINT_VERSION" \
+            --yamale-version "$YAMALE_VERSION"
       shell: bash
