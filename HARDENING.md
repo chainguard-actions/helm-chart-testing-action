@@ -1,24 +1,39 @@
+<!-- markdownlint-disable -->
+
 # Hardening Report: helm--chart-testing-action/v2.8.0
 
 > This file was generated automatically by the hardening agent.
 
-**Policy SHA:** `ff50f15e4b79bfbf764dafdfd2579175a6ea9771`
+**Policy SHA:** `d636be7e43ef829af6e853da6b3c7566db9f72fe`
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
 **Harden Agent Version:** `1`
 
-Action **helm--chart-testing-action/v2.8.0** was hardened automatically. 4 finding(s) were identified and resolved across 2 iteration(s).
+Action **helm--chart-testing-action/v2.8.0** was hardened automatically. 5 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-The `run:` block in action.yml directly interpolates attacker-controlled `inputs.*` expressions into the shell command string without first assigning them to environment variables. Specifically, `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` are embedded directly in the shell command passed to bash. A malicious input value (e.g., containing shell metacharacters or newlines) could alter the command being executed. These values should be assigned to `env:` variables and referenced as `$VERSION`, `$YAMLLINT_VERSION`, etc.
+Sub-rule (a): The `run:` block in action.yml directly interpolates three user-controlled input expressions into the shell command string without routing them through env vars: `--version ${{ inputs.version }}`, `--yamllint-version ${{ inputs.yamllint_version }}`, and `--yamale-version ${{ inputs.yamale_version }}`. These expressions are expanded by the GitHub Actions template engine before the shell ever sees the command, allowing an attacker who controls these inputs to inject arbitrary shell commands (e.g., a version value of `3.14.0 && malicious-command`).
 
 Locations:
 
+- `action.yml:26`
 - `action.yml:27`
+- `action.yml:28`
+
+### github-env-injection (severity: high)
+
+In ct.sh, the variable `cache_dir` is constructed as `"${RUNNER_TOOL_CACHE}/ct/${version}/${arch}"` where `version` is derived from the `inputs.version` action input (passed as a CLI argument from action.yml). `venv_dir` is derived from `cache_dir`. All four writes to the special environment files — `echo "${cache_dir}" >> "${GITHUB_PATH}"`, `echo "CT_CONFIG_DIR=${cache_dir}/etc" >> "${GITHUB_ENV}"`, `echo "VIRTUAL_ENV=${venv_dir}" >> "${GITHUB_ENV}"`, and `echo "${venv_dir}/bin" >> "${GITHUB_PATH}"` — use values that trace back to the user-controlled `inputs.version` without the required `printf '%s' ... | tr -d '\n\r'` sanitization. A newline character embedded in `inputs.version` would allow injection of arbitrary key=value pairs into `$GITHUB_ENV` or arbitrary paths into `$GITHUB_PATH`.
+
+Locations:
+
+- `ct.sh:97`
+- `ct.sh:100`
+- `ct.sh:103`
+- `ct.sh:104`
 
 ### static-inline-injection (severity: high)
 
@@ -48,17 +63,9 @@ Locations:
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, static-inline-injection
+**Fixes applied:** script-injection, static-inline-injection, github-env-injection
 
 **Notes:**
 
-Moved all three ${{ inputs.* }} expressions (${{ inputs.version }}, ${{ inputs.yamllint_version }}, ${{ inputs.yamale_version }}) from the run: block into an env: block as VERSION, YAMLLINT_VERSION, and YAMALE_VERSION respectively. The shell script now references these safe environment variables with double-quotes ("$VERSION", "$YAMLLINT_VERSION", "$YAMALE_VERSION") instead of directly interpolating GitHub Actions expressions, eliminating the script injection risk.
-
-### Iteration 2
-
-**Fixes applied:** github-env-injection
-
-**Notes:**
-
-Fixed ct.sh to sanitize the `version`, `yamllint_version`, and `yamale_version` variables at the start of `install_chart_testing()` using `printf '%s' ... | tr -d '\n\r'` before they are used to construct `cache_dir` and `venv_dir`. Also replaced direct `echo` writes to `$GITHUB_PATH` and `$GITHUB_ENV` with `printf`-based writes that sanitize values inline as defense-in-depth. This prevents newline injection attacks via the `inputs.version` (or other version inputs) value.
+Fixed script-injection in action.yml by moving all three ${{ inputs.version }}, ${{ inputs.yamllint_version }}, and ${{ inputs.yamale_version }} expressions into an env: block (as CT_VERSION, CT_YAMLLINT_VERSION, CT_YAMALE_VERSION) and referencing them as plain shell environment variables in the run: block. Fixed github-env-injection in ct.sh by sanitizing cache_dir and venv_dir with `printf '%s' ... | tr -d '\n\r'` before writing to $GITHUB_PATH and $GITHUB_ENV, preventing newline injection attacks.
 
