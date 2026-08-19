@@ -1,0 +1,121 @@
+name: test-chart-testing-action
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  test_ct_action:
+    runs-on: ubuntu-latest
+
+    name: Install chart-testing and test presence in path
+    steps:
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Install chart-testing
+      uses: ./
+    - name: Check install!
+      run: |
+        ct version
+        CT_VERSION_OUTPUT=$(ct version 2>&1 /dev/null)
+        ACTUAL_VERSION=$(echo "$CT_VERSION_OUTPUT" | grep Version | rev | cut -d ' ' -f1 | rev)
+        if [[ $ACTUAL_VERSION != 'v3.14.0' ]]; then
+          echo 'should be v3.14.0'
+          exit 1
+        else
+          exit 0
+        fi
+      shell: bash
+    - name: Check root directory
+      run: |
+        if [[ $(git diff --stat) != '' ]]; then
+          echo 'should be clean'
+          exit 1
+        else
+          exit 0
+        fi
+
+  test_ct_action_custom:
+    runs-on: ubuntu-latest
+
+    name: Install Custom chart-testing and test presence in path
+    steps:
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - name: Install chart-testing
+      uses: ./
+      with:
+        version: 'v3.8.0'
+        yamllint_version: '1.27.1'
+        yamale_version: '3.0.4'
+    - name: Check install!
+      run: |
+        ct version
+        CT_VERSION_OUTPUT=$(ct version 2>&1 /dev/null)
+        ACTUAL_VERSION=$(echo "$CT_VERSION_OUTPUT" | grep Version | rev | cut -d ' ' -f1 | rev)
+        if [[ $ACTUAL_VERSION != 'v3.8.0' ]]; then
+          echo 'should be v3.8.0'
+          exit 1
+        else
+          exit 0
+        fi
+      shell: bash
+    - name: Check root directory
+      run: |
+        if [[ $(git diff --stat) != '' ]]; then
+          echo 'should be clean'
+          exit 1
+        else
+          exit 0
+        fi
+
+  test_ct_action_with_helm:
+    runs-on: ubuntu-latest
+
+    name: run action to test a helm chart
+    steps:
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      with:
+        fetch-depth: 0
+
+    - name: Set up Helm
+      uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+      with:
+        version: v3.17.0
+
+    - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+      with:
+        python-version: '3.x'
+        check-latest: true
+
+    - name: Install chart-testing
+      uses: ./
+
+    - run: |
+        sed -i "s/version: .*/version: 2.0.0/" testdata/simple-deployment/Chart.yaml
+        cat testdata/simple-deployment/Chart.yaml
+
+    - name: Run chart-testing (list-changed)
+      id: list-changed
+      env:
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        changed=$(ct list-changed --chart-dirs=testdata --target-branch "$DEFAULT_BRANCH")
+        if [[ -n "$changed" ]]; then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run chart-testing (lint)
+      if: steps.list-changed.outputs.changed == 'true'
+      env:
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: ct lint --chart-dirs=testdata --target-branch "$DEFAULT_BRANCH"
+
+    - name: Create kind cluster
+      if: steps.list-changed.outputs.changed == 'true'
+      uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+
+    - name: Run chart-testing (install)
+      if: steps.list-changed.outputs.changed == 'true'
+      env:
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: ct install --chart-dirs=testdata --target-branch "$DEFAULT_BRANCH"

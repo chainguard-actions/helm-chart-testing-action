@@ -1,0 +1,58 @@
+name: Test custom version input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        name: Install chart-testing with custom version
+        uses: .
+        with:
+          version: '3.11.0'
+          yamllint_version: '1.29.0'
+          yamale_version: '5.0.0'
+
+      - name: Assert ct is available in PATH
+        run: |
+          echo "Checking ct binary..."
+          if ! command -v ct &>/dev/null; then
+            echo "FAIL: ct binary not found in PATH"
+            exit 1
+          fi
+          echo "PASS: ct found at $(command -v ct)"
+
+      - name: Assert ct version matches requested version
+        run: |
+          echo "Running ct version..."
+          CT_VERSION_OUTPUT=$(ct version 2>&1)
+          echo "ct version output: $CT_VERSION_OUTPUT"
+          if ! echo "$CT_VERSION_OUTPUT" | grep -q '3.11.0'; then
+            echo "FAIL: expected ct version 3.11.0 but got: $CT_VERSION_OUTPUT"
+            exit 1
+          fi
+          echo "PASS: ct version 3.11.0 confirmed"
+
+      - name: Assert yamllint version matches requested version
+        run: |
+          echo "Checking yamllint version..."
+          YAMLLINT_VER=$(yamllint --version 2>&1)
+          echo "yamllint version: $YAMLLINT_VER"
+          if ! echo "$YAMLLINT_VER" | grep -q '1.29.0'; then
+            echo "FAIL: expected yamllint 1.29.0 but got: $YAMLLINT_VER"
+            exit 1
+          fi
+          echo "PASS: yamllint 1.29.0 confirmed"
+
+      - name: Assert yamale version matches requested version
+        run: |
+          echo "Checking yamale version..."
+          YAMALE_VER=$(python3 -c "import yamale; print(yamale.__version__)" 2>&1)
+          echo "yamale version: $YAMALE_VER"
+          if ! echo "$YAMALE_VER" | grep -q '5.0.0'; then
+            echo "FAIL: expected yamale 5.0.0 but got: $YAMALE_VER"
+            exit 1
+          fi
+          echo "PASS: yamale 5.0.0 confirmed"

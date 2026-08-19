@@ -1,0 +1,74 @@
+name: Test basic usage - default versions
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        name: Install chart-testing with defaults
+        uses: .
+
+      - name: Assert ct is available in PATH
+        run: |
+          echo "Checking ct binary..."
+          if ! command -v ct &>/dev/null; then
+            echo "FAIL: ct binary not found in PATH"
+            exit 1
+          fi
+          echo "PASS: ct found at $(command -v ct)"
+
+      - name: Assert ct version output
+        run: |
+          echo "Running ct version..."
+          CT_VERSION_OUTPUT=$(ct version 2>&1)
+          echo "ct version output: $CT_VERSION_OUTPUT"
+          if ! echo "$CT_VERSION_OUTPUT" | grep -qiE 'version|chart-testing'; then
+            echo "FAIL: ct version output does not look valid: $CT_VERSION_OUTPUT"
+            exit 1
+          fi
+          echo "PASS: ct version output looks valid"
+
+      - name: Assert yamllint is available
+        run: |
+          echo "Checking yamllint..."
+          if ! command -v yamllint &>/dev/null; then
+            echo "FAIL: yamllint not found in PATH"
+            exit 1
+          fi
+          YAMLLINT_VER=$(yamllint --version 2>&1)
+          echo "yamllint version: $YAMLLINT_VER"
+          echo "PASS: yamllint found"
+
+      - name: Assert yamale is available
+        run: |
+          echo "Checking yamale..."
+          if ! python3 -c "import yamale" 2>/dev/null; then
+            echo "FAIL: yamale Python package not importable"
+            exit 1
+          fi
+          echo "PASS: yamale importable"
+
+      - name: Assert CT_CONFIG_DIR env var is set
+        env:
+          CT_CONFIG_DIR: ${{ env.CT_CONFIG_DIR }}
+        run: |
+          echo "CT_CONFIG_DIR: $CT_CONFIG_DIR"
+          if [ -z "$CT_CONFIG_DIR" ]; then
+            echo "FAIL: CT_CONFIG_DIR is not set"
+            exit 1
+          fi
+          echo "PASS: CT_CONFIG_DIR=$CT_CONFIG_DIR"
+
+      - name: Assert VIRTUAL_ENV env var is set
+        env:
+          VIRTUAL_ENV: ${{ env.VIRTUAL_ENV }}
+        run: |
+          echo "VIRTUAL_ENV: $VIRTUAL_ENV"
+          if [ -z "$VIRTUAL_ENV" ]; then
+            echo "FAIL: VIRTUAL_ENV is not set"
+            exit 1
+          fi
+          echo "PASS: VIRTUAL_ENV=$VIRTUAL_ENV"

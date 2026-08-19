@@ -122,16 +122,16 @@ install_chart_testing() {
 
     # https://github.com/helm/chart-testing-action/issues/62
     echo 'Adding ct directory to PATH...'
-    safe_cache_dir="$(printf '%s' "${cache_dir}" | tr -d '\n\r')"
-    safe_venv_dir="$(printf '%s' "${venv_dir}" | tr -d '\n\r')"
-    echo "${safe_cache_dir}" >> "${GITHUB_PATH}"
+    safe_cache_dir=$(printf '%s' "${cache_dir}" | tr -d '\n\r')
+    safe_venv_dir=$(printf '%s' "${venv_dir}" | tr -d '\n\r')
+    printf '%s\n' "${safe_cache_dir}" >> "${GITHUB_PATH}"
 
     echo 'Setting CT_CONFIG_DIR...'
-    echo "CT_CONFIG_DIR=${safe_cache_dir}/etc" >> "${GITHUB_ENV}"
+    printf 'CT_CONFIG_DIR=%s\n' "${safe_cache_dir}/etc" >> "${GITHUB_ENV}"
 
     echo 'Configuring environment variables for virtual environment for subsequent workflow steps...'
-    echo "VIRTUAL_ENV=${safe_venv_dir}" >> "${GITHUB_ENV}"
-    echo "${safe_venv_dir}/bin" >> "${GITHUB_PATH}"
+    printf 'VIRTUAL_ENV=%s\n' "${safe_venv_dir}" >> "${GITHUB_ENV}"
+    printf '%s\n' "${safe_venv_dir}/bin" >> "${GITHUB_PATH}"
 
     "${cache_dir}/ct" version
 }
