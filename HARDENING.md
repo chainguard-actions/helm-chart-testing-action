@@ -10,54 +10,39 @@
 
 **Harden Agent Version:** `2`
 
-Action **helm--chart-testing-action/v2.8.0** was hardened automatically. 8 finding(s) were identified and resolved across 1 iteration(s).
+Action **helm--chart-testing-action/v2.8.0** was hardened automatically. 5 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Sub-rule (a): Direct expression interpolation of untrusted inputs inside a run: block. In action.yml, the composite action run: step passes `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` directly as shell arguments. These values are controlled by the calling workflow and are interpolated by the Actions template engine before the shell ever sees them, allowing an attacker to inject arbitrary shell commands (e.g. a version value of `3.14.0; malicious-command`).
+Sub-rule (a): Three `${{ inputs.* }}` expressions are directly interpolated inside a `run:` shell command string in action.yml. The offending lines are:
+  `--version ${{ inputs.version }} \`
+  `--yamllint-version ${{ inputs.yamllint_version }} \`
+  `--yamale-version ${{ inputs.yamale_version }}`
+An attacker controlling these inputs (e.g. via `workflow_dispatch` or a calling workflow) can inject arbitrary shell commands. The values must be passed via an `env:` block and then referenced as quoted shell variables (e.g. `"$VERSION"`) instead of being interpolated directly.
 
 Locations:
 
-- `action.yml:24`
-
-### script-injection (severity: high)
-
-Sub-rule (a): Direct expression interpolation of `${{ github.event.repository.default_branch }}` inside run: blocks in the workflow. This GitHub context value flows through YAML template substitution before the shell parses it, enabling script injection. Affected steps: 'Run chart-testing (list-changed)', 'Run chart-testing (lint)', and 'Run chart-testing (install)'.
-
-Locations:
-
-- `.github/workflows/test-action.yml:72`
-- `.github/workflows/test-action.yml:79`
-- `.github/workflows/test-action.yml:86`
+- `action.yml:28`
+- `action.yml:29`
+- `action.yml:30`
 
 ### github-env-injection (severity: high)
 
-In ct.sh, the variables `cache_dir` and `venv_dir` are derived from the user-controlled `version` input (passed via `inputs.version` in action.yml). These values are written directly to `$GITHUB_PATH` and `$GITHUB_ENV` without the required sanitization step (`printf '%s' ... | tr -d '\n\r'`). A newline embedded in the version string could inject arbitrary environment variables or PATH entries into subsequent workflow steps.
+In ct.sh, the `version`, `yamllint_version`, and `yamale_version` variables are populated from CLI arguments that originate directly from `inputs.*` values in action.yml. These user-controlled values flow into `cache_dir` and `venv_dir`, which are then written unsanitized to `$GITHUB_PATH` and `$GITHUB_ENV`:
+  `echo "${cache_dir}" >> "${GITHUB_PATH}"`
+  `echo "CT_CONFIG_DIR=${cache_dir}/etc" >> "${GITHUB_ENV}"`
+  `echo "VIRTUAL_ENV=${venv_dir}" >> "${GITHUB_ENV}"`
+  `echo "${venv_dir}/bin" >> "${GITHUB_PATH}"`
+Without the required sanitization step (`printf '%s' "$VAR" | tr -d '\n\r'`) before each write, a newline embedded in an input value can inject arbitrary environment variables or PATH entries into subsequent workflow steps.
 
 Locations:
 
-- `ct.sh:89`
-- `ct.sh:92`
-- `ct.sh:95`
-- `ct.sh:96`
-
-### unpinned-uses (severity: high)
-
-The workflow references `helm/kind-action@v1.13.0`, which is pinned to a mutable version tag rather than an immutable 40-character commit SHA. This is vulnerable to supply-chain attacks if the tag is moved. All other `uses:` references in the workflow and action.yml are correctly pinned to full SHAs.
-
-Locations:
-
-- `.github/workflows/test-action.yml:83`
-
-### missing-permissions (severity: medium)
-
-The workflow file `.github/workflows/test-action.yml` has no top-level `permissions:` key and none of its three jobs (`test_ct_action`, `test_ct_action_custom`, `test_ct_action_with_helm`) define a `permissions:` block. Without explicit permissions, the workflow inherits the repository default (typically `write` for all scopes on private repos), granting unnecessarily broad access to the GITHUB_TOKEN.
-
-Locations:
-
-- `.github/workflows/test-action.yml:1`
+- `ct.sh:103`
+- `ct.sh:106`
+- `ct.sh:109`
+- `ct.sh:110`
 
 ### static-inline-injection (severity: high)
 
@@ -87,19 +72,9 @@ Locations:
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, static-inline-injection, github-env-injection, unpinned-uses, missing-permissions
+**Fixes applied:** script-injection, static-inline-injection, github-env-injection
 
 **Notes:**
 
-Fixed all 8 findings across 3 files:
-
-1. action.yml (script-injection / static-inline-injection): Moved ${{ inputs.version }}, ${{ inputs.yamllint_version }}, and ${{ inputs.yamale_version }} from the run: block into an env: block as CT_VERSION, CT_YAMLLINT_VERSION, CT_YAMALE_VERSION. The run: block now references these as shell environment variables.
-
-2. ct.sh (github-env-injection): Added sanitization for cache_dir and venv_dir before writing to $GITHUB_PATH and $GITHUB_ENV. Used `printf '%s' "${var}" | tr -d '\n\r'` to strip newlines, storing results in safe_cache_dir and safe_venv_dir, then used printf for all writes to GITHUB_PATH/GITHUB_ENV.
-
-3. .github/workflows/test-action.yml (script-injection): Moved ${{ github.event.repository.default_branch }} to env: blocks (as DEFAULT_BRANCH) in all three affected steps: 'Run chart-testing (list-changed)', 'Run chart-testing (lint)', and 'Run chart-testing (install)'.
-
-4. .github/workflows/test-action.yml (unpinned-uses): Pinned helm/kind-action@v1.13.0 to full commit SHA 92086f6be054225fa813e0a4b13787fc9088faab with the tag preserved as a comment.
-
-5. .github/workflows/test-action.yml (missing-permissions): Added top-level `permissions: {}` to deny all permissions by default.
+Fixed two categories of issues: (1) In action.yml, moved all three ${{ inputs.* }} expressions (version, yamllint_version, yamale_version) out of the run: shell string and into an env: block as CT_VERSION, CT_YAMLLINT_VERSION, CT_YAMALE_VERSION; the shell script now references them as quoted variables. (2) In ct.sh, added sanitization of cache_dir and venv_dir using printf '%s' | tr -d '\n\r' before all four writes to $GITHUB_PATH and $GITHUB_ENV, preventing newline injection attacks.
 

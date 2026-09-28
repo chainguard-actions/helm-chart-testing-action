@@ -37,8 +37,8 @@ runs:
         curl "${args[@]}" \
           -d "{\"repository\":\"${GITHUB_REPOSITORY}\",\"action\":\"${GITHUB_ACTION_REPOSITORY}\"}" \
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
-    - uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
-    - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
+    - uses: chainguard-actions/sigstore-cosign-installer@c7df21c0b78e42232cb1c80c34b2baf4cfd54a52 # v4.0.0
+    - uses: chainguard-actions/astral-sh-setup-uv@1d42c014da3997d1b18a0735dd903b05db2390a9 # v7.0.0
     - env:
         CT_VERSION: ${{ inputs.version }}
         CT_YAMLLINT_VERSION: ${{ inputs.yamllint_version }}
