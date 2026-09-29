@@ -122,8 +122,8 @@ install_chart_testing() {
 
     # https://github.com/helm/chart-testing-action/issues/62
     echo 'Adding ct directory to PATH...'
-    safe_cache_dir="$(printf '%s' "${cache_dir}" | tr -d '\n\r')"
-    safe_venv_dir="$(printf '%s' "${venv_dir}" | tr -d '\n\r')"
+    safe_cache_dir=$(printf '%s' "${cache_dir}" | tr -d '\n\r')
+    safe_venv_dir=$(printf '%s' "${venv_dir}" | tr -d '\n\r')
     echo "${safe_cache_dir}" >> "${GITHUB_PATH}"
 
     echo 'Setting CT_CONFIG_DIR...'

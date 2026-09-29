@@ -16,33 +16,38 @@ Action **helm--chart-testing-action/v2.8.0** was hardened automatically. 5 findi
 
 ### script-injection (severity: high)
 
-Sub-rule (a): Three `${{ inputs.* }}` expressions are directly interpolated inside a `run:` shell command string in action.yml. The offending lines are:
+Sub-rule (a): Three `inputs.*` expressions are interpolated directly inside a `run:` shell command string in action.yml. The values `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` are passed as unquoted CLI arguments to `./ct.sh`. An attacker who controls these inputs (e.g. via `workflow_dispatch` or a calling workflow) can inject arbitrary shell commands. The offending lines are:
   `--version ${{ inputs.version }} \`
   `--yamllint-version ${{ inputs.yamllint_version }} \`
   `--yamale-version ${{ inputs.yamale_version }}`
-An attacker controlling these inputs (e.g. via `workflow_dispatch` or a calling workflow) can inject arbitrary shell commands. The values must be passed via an `env:` block and then referenced as quoted shell variables (e.g. `"$VERSION"`) instead of being interpolated directly.
+Fix: route each input through an `env:` variable and double-quote the shell expansion, e.g. `env: { VERSION: "${{ inputs.version }}" }` and then `--version "$VERSION"`.
 
 Locations:
 
+- `action.yml:27`
 - `action.yml:28`
 - `action.yml:29`
-- `action.yml:30`
 
 ### github-env-injection (severity: high)
 
-In ct.sh, the `version`, `yamllint_version`, and `yamale_version` variables are populated from CLI arguments that originate directly from `inputs.*` values in action.yml. These user-controlled values flow into `cache_dir` and `venv_dir`, which are then written unsanitized to `$GITHUB_PATH` and `$GITHUB_ENV`:
+In ct.sh, the variables `cache_dir` and `venv_dir` are derived from the user-controlled `version` input (passed via CLI argument from `${{ inputs.version }}` in action.yml) and are written unsanitized to `$GITHUB_PATH` and `$GITHUB_ENV`. No `printf '%s' ... | tr -d '\n\r'` sanitization is applied before any of the four writes. A newline embedded in the `version` input could inject arbitrary environment variable assignments or PATH entries into subsequent workflow steps.
+
+Offending lines in ct.sh:
   `echo "${cache_dir}" >> "${GITHUB_PATH}"`
   `echo "CT_CONFIG_DIR=${cache_dir}/etc" >> "${GITHUB_ENV}"`
   `echo "VIRTUAL_ENV=${venv_dir}" >> "${GITHUB_ENV}"`
   `echo "${venv_dir}/bin" >> "${GITHUB_PATH}"`
-Without the required sanitization step (`printf '%s' "$VAR" | tr -d '\n\r'`) before each write, a newline embedded in an input value can inject arbitrary environment variables or PATH entries into subsequent workflow steps.
+
+Fix: sanitize each value before writing, e.g.:
+  `safe_cache_dir=$(printf '%s' "${cache_dir}" | tr -d '\n\r')`
+  `echo "${safe_cache_dir}" >> "${GITHUB_PATH}"`
 
 Locations:
 
-- `ct.sh:103`
-- `ct.sh:106`
-- `ct.sh:109`
-- `ct.sh:110`
+- `ct.sh:80`
+- `ct.sh:83`
+- `ct.sh:86`
+- `ct.sh:87`
 
 ### static-inline-injection (severity: high)
 
@@ -76,5 +81,9 @@ Locations:
 
 **Notes:**
 
-Fixed two categories of issues: (1) In action.yml, moved all three ${{ inputs.* }} expressions (version, yamllint_version, yamale_version) out of the run: shell string and into an env: block as CT_VERSION, CT_YAMLLINT_VERSION, CT_YAMALE_VERSION; the shell script now references them as quoted variables. (2) In ct.sh, added sanitization of cache_dir and venv_dir using printf '%s' | tr -d '\n\r' before all four writes to $GITHUB_PATH and $GITHUB_ENV, preventing newline injection attacks.
+Fixed two files:
+
+1. action.yml: Moved all three `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` expressions out of the `run:` shell string into an `env:` block (as CT_VERSION, CT_YAMLLINT_VERSION, CT_YAMALE_VERSION). The shell script now uses double-quoted `"$CT_VERSION"`, `"$CT_YAMLLINT_VERSION"`, `"$CT_YAMALE_VERSION"` references, eliminating script injection risk.
+
+2. ct.sh: Added sanitization of `cache_dir` and `venv_dir` using `printf '%s' ... | tr -d '\n\r'` before all four writes to $GITHUB_PATH and $GITHUB_ENV. The sanitized variables `safe_cache_dir` and `safe_venv_dir` are used for all writes, preventing newline-based environment injection attacks.
 
