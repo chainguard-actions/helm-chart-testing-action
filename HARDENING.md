@@ -16,38 +16,33 @@ Action **helm--chart-testing-action/v2.8.0** was hardened automatically. 5 findi
 
 ### script-injection (severity: high)
 
-Sub-rule (a): Three `inputs.*` expressions are interpolated directly inside a `run:` shell command string in action.yml. The values `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` are passed as unquoted CLI arguments to `./ct.sh`. An attacker who controls these inputs (e.g. via `workflow_dispatch` or a calling workflow) can inject arbitrary shell commands. The offending lines are:
-  `--version ${{ inputs.version }} \`
-  `--yamllint-version ${{ inputs.yamllint_version }} \`
+The `run:` block in action.yml directly interpolates `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` as unquoted arguments in the shell command string passed to `./ct.sh`. This violates rule (a) — any `${{ ... }}` expression inside a `run:` block is a script-injection risk — and rule (b) — the values are passed unquoted, allowing an attacker-controlled input containing shell metacharacters (`;`, `|`, `&`, `$(...)`, etc.) to execute arbitrary commands. The offending lines are:
+  `--version ${{ inputs.version }}`
+  `--yamllint-version ${{ inputs.yamllint_version }}`
   `--yamale-version ${{ inputs.yamale_version }}`
-Fix: route each input through an `env:` variable and double-quote the shell expansion, e.g. `env: { VERSION: "${{ inputs.version }}" }` and then `--version "$VERSION"`.
+Fix: route each input through an `env:` variable and double-quote the shell expansion, e.g. `"$VERSION"`.
 
 Locations:
 
+- `action.yml:25`
+- `action.yml:26`
 - `action.yml:27`
-- `action.yml:28`
-- `action.yml:29`
 
 ### github-env-injection (severity: high)
 
-In ct.sh, the variables `cache_dir` and `venv_dir` are derived from the user-controlled `version` input (passed via CLI argument from `${{ inputs.version }}` in action.yml) and are written unsanitized to `$GITHUB_PATH` and `$GITHUB_ENV`. No `printf '%s' ... | tr -d '\n\r'` sanitization is applied before any of the four writes. A newline embedded in the `version` input could inject arbitrary environment variable assignments or PATH entries into subsequent workflow steps.
-
-Offending lines in ct.sh:
-  `echo "${cache_dir}" >> "${GITHUB_PATH}"`
-  `echo "CT_CONFIG_DIR=${cache_dir}/etc" >> "${GITHUB_ENV}"`
-  `echo "VIRTUAL_ENV=${venv_dir}" >> "${GITHUB_ENV}"`
-  `echo "${venv_dir}/bin" >> "${GITHUB_PATH}"`
-
-Fix: sanitize each value before writing, e.g.:
-  `safe_cache_dir=$(printf '%s' "${cache_dir}" | tr -d '\n\r')`
-  `echo "${safe_cache_dir}" >> "${GITHUB_PATH}"`
+In `ct.sh`, four writes to `$GITHUB_PATH` and `$GITHUB_ENV` use values (`${cache_dir}` and `${venv_dir}`) that are derived from the `version`, `yamllint_version`, and `yamale_version` shell variables. These variables are populated from CLI arguments supplied directly by the `${{ inputs.* }}` interpolations in `action.yml`, making them attacker-controlled. None of the writes are preceded by the required sanitization step (`printf '%s' "$VAR" | tr -d '\n\r'`), so a newline embedded in an input value could inject arbitrary environment variables or PATH entries into subsequent workflow steps.
+  Line ~88: `echo "${cache_dir}" >> "${GITHUB_PATH}"`
+  Line ~91: `echo "CT_CONFIG_DIR=${cache_dir}/etc" >> "${GITHUB_ENV}"`
+  Line ~94: `echo "VIRTUAL_ENV=${venv_dir}" >> "${GITHUB_ENV}"`
+  Line ~95: `echo "${venv_dir}/bin" >> "${GITHUB_PATH}"`
+Fix: sanitize each value before writing, e.g. `safe=$(printf '%s' "${cache_dir}" | tr -d '\n\r'); echo "${safe}" >> "${GITHUB_PATH}"`.
 
 Locations:
 
-- `ct.sh:80`
-- `ct.sh:83`
-- `ct.sh:86`
-- `ct.sh:87`
+- `ct.sh:88`
+- `ct.sh:91`
+- `ct.sh:94`
+- `ct.sh:95`
 
 ### static-inline-injection (severity: high)
 
@@ -81,9 +76,9 @@ Locations:
 
 **Notes:**
 
-Fixed two files:
+Fixed two categories of findings:
 
-1. action.yml: Moved all three `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` expressions out of the `run:` shell string into an `env:` block (as CT_VERSION, CT_YAMLLINT_VERSION, CT_YAMALE_VERSION). The shell script now uses double-quoted `"$CT_VERSION"`, `"$CT_YAMLLINT_VERSION"`, `"$CT_YAMALE_VERSION"` references, eliminating script injection risk.
+1. action.yml (script-injection / static-inline-injection): Moved `${{ inputs.version }}`, `${{ inputs.yamllint_version }}`, and `${{ inputs.yamale_version }}` from the `run:` block into an `env:` block as `CT_VERSION`, `CT_YAMLLINT_VERSION`, and `CT_YAMALE_VERSION`. The shell script now references them as double-quoted variables (`"$CT_VERSION"`, etc.), preventing shell metacharacter injection.
 
-2. ct.sh: Added sanitization of `cache_dir` and `venv_dir` using `printf '%s' ... | tr -d '\n\r'` before all four writes to $GITHUB_PATH and $GITHUB_ENV. The sanitized variables `safe_cache_dir` and `safe_venv_dir` are used for all writes, preventing newline-based environment injection attacks.
+2. ct.sh (github-env-injection): Added sanitization before all four writes to `$GITHUB_PATH` and `$GITHUB_ENV`. `cache_dir` is sanitized into `safe_cache_dir` and `venv_dir` into `safe_venv_dir` using `printf '%s' "${var}" | tr -d '\n\r'` before being written, preventing newline injection attacks.
 
