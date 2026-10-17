@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v2.8.0 | [`v2.8.0`](https://github.com/chainguard-actions/helm-chart-testing-action/tree/v2.8.0) | [`6ec842c`](https://github.com/helm/chart-testing-action/commit/6ec842c01de15ebb84c8627d2744a0c2f2755c9f) |
+| v2.9.0 | [`v2.9.0`](https://github.com/chainguard-actions/helm-chart-testing-action/tree/v2.9.0) | [`7202708`](https://github.com/helm/chart-testing-action/commit/720270857a28afd41e2426521a7801db09e9b510) |
 
 ## Privacy
 
