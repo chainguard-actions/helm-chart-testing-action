@@ -1,0 +1,37 @@
+name: Test custom lint_config input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          verify_blob: 'false'
+          lint_config: '${{ github.workspace }}/tests/fixtures/yamllint-config/.yamllint.yaml'
+
+      - name: Assert ct is installed
+        run: |
+          if ! command -v ct &>/dev/null; then
+            echo "FAIL: ct not found in PATH"
+            exit 1
+          fi
+          echo "PASS: ct found at $(command -v ct)"
+
+      - name: Assert CT_LINT_CONF env var is set and points to the config file
+        env:
+          CT_LINT_CONF: ${{ env.CT_LINT_CONF }}
+        run: |
+          echo "CT_LINT_CONF: $CT_LINT_CONF"
+          if [ -z "$CT_LINT_CONF" ]; then
+            echo "FAIL: CT_LINT_CONF is not set"
+            exit 1
+          fi
+          if [ ! -f "$CT_LINT_CONF" ]; then
+            echo "FAIL: CT_LINT_CONF file does not exist: $CT_LINT_CONF"
+            exit 1
+          fi
+          echo "PASS: CT_LINT_CONF is set to $CT_LINT_CONF"

@@ -1,0 +1,59 @@
+name: Test basic usage (default version)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          verify_blob: 'false'
+
+      - name: Assert ct is installed and on PATH
+        run: |
+          echo "Checking ct binary..."
+          if ! command -v ct &>/dev/null; then
+            echo "FAIL: ct not found in PATH"
+            exit 1
+          fi
+          echo "PASS: ct found at $(command -v ct)"
+
+      - name: Assert ct version matches default
+        run: |
+          CT_VER="$(ct version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'  | head -1)"
+          echo "ct version: $CT_VER"
+          if [ "$CT_VER" != "3.15.0" ]; then
+            echo "FAIL: expected version 3.15.0, got $CT_VER"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert yamllint is installed
+        run: |
+          if ! command -v yamllint &>/dev/null; then
+            echo "FAIL: yamllint not found in PATH"
+            exit 1
+          fi
+          echo "PASS: yamllint found at $(command -v yamllint)"
+
+      - name: Assert yamale is installed
+        run: |
+          if ! python -c "import yamale" 2>/dev/null; then
+            echo "FAIL: yamale Python package not importable"
+            exit 1
+          fi
+          echo "PASS: yamale importable"
+
+      - name: Assert CT_CONFIG_DIR env var is set
+        env:
+          CT_CONFIG_DIR: ${{ env.CT_CONFIG_DIR }}
+        run: |
+          echo "CT_CONFIG_DIR: $CT_CONFIG_DIR"
+          if [ -z "$CT_CONFIG_DIR" ]; then
+            echo "FAIL: CT_CONFIG_DIR is not set"
+            exit 1
+          fi
+          echo "PASS"

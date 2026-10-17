@@ -1,0 +1,46 @@
+name: Test custom version installation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          version: '3.11.0'
+          verify_blob: 'false'
+          yamllint_version: '1.29.0'
+          yamale_version: '4.0.4'
+
+      - name: Assert ct is installed with the requested version
+        run: |
+          CT_VER="$(ct version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          echo "ct version: $CT_VER"
+          if [ "$CT_VER" != "3.11.0" ]; then
+            echo "FAIL: expected version 3.11.0, got $CT_VER"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert yamllint version matches requested
+        run: |
+          YL_VER="$(yamllint --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          echo "yamllint version: $YL_VER"
+          if [ "$YL_VER" != "1.29.0" ]; then
+            echo "FAIL: expected yamllint 1.29.0, got $YL_VER"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert yamale version matches requested
+        run: |
+          YM_VER="$(python -c "import yamale; print(yamale.__version__)" 2>/dev/null)"
+          echo "yamale version: $YM_VER"
+          if [ "$YM_VER" != "4.0.4" ]; then
+            echo "FAIL: expected yamale 4.0.4, got $YM_VER"
+            exit 1
+          fi
+          echo "PASS"

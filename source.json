@@ -1,6 +1,12 @@
 {
   "owner": "helm",
   "repo": "chart-testing-action",
-  "version": "",
-  "url": "https://github.com/helm/chart-testing-action"
+  "version": "v2.9.0",
+  "commit_sha": "720270857a28afd41e2426521a7801db09e9b510",
+  "url": "https://github.com/helm/chart-testing-action",
+  "policy_sha": "d636be7e43ef829af6e853da6b3c7566db9f72fe",
+  "test_policy_sha": "843adf9e4b8f85d0c08b27b9d0b09dd094b54702",
+  "test_agent_version": "2",
+  "harden_agent_version": "2",
+  "dependency_fingerprint": "sha256:6e220c0d05512242b05a2bc5a8c1523a8bf1019a000a6ba8049b479f5508e74a"
 }
